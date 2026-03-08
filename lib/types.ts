@@ -68,6 +68,7 @@ export interface WATResults {
   flScore: number;
   regularityScore: number;
   periodicityIndex: number;
+  estimatedArousalIndex: number;
 }
 
 export interface Breath {

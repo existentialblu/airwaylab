@@ -16,9 +16,10 @@ interface MetricCardProps {
 }
 
 function formatValue(value: number, format?: string): string {
-  if (format === 'int') return Math.round(value).toString();
-  if (format === 'pct') return value.toFixed(0) + '%';
-  return value.toFixed(1);
+  const v = value ?? 0;
+  if (format === 'int') return Math.round(v).toString();
+  if (format === 'pct') return v.toFixed(0) + '%';
+  return v.toFixed(1);
 }
 
 export const MetricCard = memo(function MetricCard({

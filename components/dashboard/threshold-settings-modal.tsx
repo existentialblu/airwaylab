@@ -17,6 +17,7 @@ const GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
       { key: 'watFL', label: 'FL Score' },
       { key: 'watRegularity', label: 'Regularity' },
       { key: 'watPeriodicity', label: 'Periodicity' },
+      { key: 'watEAI', label: 'Est. Arousal Index' },
     ],
   },
   {

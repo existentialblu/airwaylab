@@ -11,15 +11,16 @@ import type { WATResults } from '../types';
  */
 export function computeWAT(flowData: Float32Array, samplingRate: number): WATResults {
   const flScore = analyzeFlowLimitation(flowData, samplingRate);
+  const estimatedArousalIndex = computeEstimatedArousalIndex(flowData, samplingRate);
   const minuteVent = calculateMinuteVent(flowData, samplingRate);
 
   if (minuteVent.length < 4) {
-    return { flScore, regularityScore: 0, periodicityIndex: 0 };
+    return { flScore, regularityScore: 0, periodicityIndex: 0, estimatedArousalIndex };
   }
 
   const { regularityScore, periodicityIndex } = analyzePeriodicBreathing(minuteVent);
 
-  return { flScore, regularityScore, periodicityIndex };
+  return { flScore, regularityScore, periodicityIndex, estimatedArousalIndex };
 }
 
 // ============================================================
@@ -263,4 +264,138 @@ function nextPow2(n: number): number {
   let p = 1;
   while (p < n) p <<= 1;
   return p;
+}
+
+// ============================================================
+// Estimated Arousal Index (EAI)
+// Ported from wobble-analysis-tool (existentialblu/WAT)
+// Detects arousal events via respiratory rate increase >20%
+// OR tidal volume increase >30% vs 120-second sliding baseline.
+// 15-second refractory period suppresses duplicate detections.
+// ============================================================
+const EAI_BASELINE_WINDOW_SECONDS = 120;
+const EAI_RATE_THRESHOLD = 0.20;
+const EAI_VOLUME_THRESHOLD = 0.30;
+const EAI_REFRACTORY_SECONDS = 15;
+const EAI_MIN_BASELINE_BREATHS = 5;
+
+interface BreathMetric {
+  time: number;       // seconds from start
+  rate: number;       // respiratory rate (breaths/min)
+  volume: number;     // tidal volume (integrated inspiratory flow)
+}
+
+export function computeEstimatedArousalIndex(
+  flowData: Float32Array,
+  samplingRate: number
+): number {
+  // Extract breath-by-breath metrics
+  const breathMetrics = extractBreathMetrics(flowData, samplingRate);
+
+  if (breathMetrics.length < 10) {
+    return 0;
+  }
+
+  const totalDurationSeconds = flowData.length / samplingRate;
+  const durationHours = totalDurationSeconds / 3600;
+  if (durationHours < 0.01) {
+    return 0;
+  }
+
+  const arousals: { time: number }[] = [];
+
+  for (let i = 0; i < breathMetrics.length; i++) {
+    const current = breathMetrics[i];
+
+    // Compute how many breaths back the 120-second window covers
+    const windowBreaths = Math.floor(
+      EAI_BASELINE_WINDOW_SECONDS / (60 / current.rate)
+    );
+    const baselineStart = Math.max(0, i - windowBreaths);
+    const baselineMetrics = breathMetrics.slice(baselineStart, i);
+
+    if (baselineMetrics.length < EAI_MIN_BASELINE_BREATHS) continue;
+
+    // Compute baseline averages
+    let sumRate = 0;
+    let sumVol = 0;
+    for (const m of baselineMetrics) {
+      sumRate += m.rate;
+      sumVol += m.volume;
+    }
+    const baselineRate = sumRate / baselineMetrics.length;
+    const baselineVolume = sumVol / baselineMetrics.length;
+
+    // Check for arousal: rate increase >20% OR volume increase >30%
+    const rateIncrease = baselineRate > 0
+      ? (current.rate - baselineRate) / baselineRate
+      : 0;
+    const volumeIncrease = baselineVolume > 0
+      ? (current.volume - baselineVolume) / baselineVolume
+      : 0;
+
+    if (rateIncrease > EAI_RATE_THRESHOLD || volumeIncrease > EAI_VOLUME_THRESHOLD) {
+      // Refractory period: skip if an arousal was detected within 15 seconds
+      const recentArousal = arousals.length > 0 &&
+        (current.time - arousals[arousals.length - 1].time) < EAI_REFRACTORY_SECONDS;
+
+      if (!recentArousal) {
+        arousals.push({ time: current.time });
+      }
+    }
+  }
+
+  return durationHours > 0 ? arousals.length / durationHours : 0;
+}
+
+function extractBreathMetrics(
+  flowData: Float32Array,
+  samplingRate: number
+): BreathMetric[] {
+  // Find breath boundaries at positive-going zero crossings
+  const breathStarts: number[] = [];
+  for (let i = 1; i < flowData.length; i++) {
+    if (flowData[i] > 0 && flowData[i - 1] <= 0) {
+      breathStarts.push(i);
+    }
+  }
+
+  if (breathStarts.length < 2) return [];
+
+  const metrics: BreathMetric[] = [];
+
+  for (let i = 1; i < breathStarts.length; i++) {
+    const start = breathStarts[i - 1];
+    const end = breathStarts[i];
+    const startTime = start / samplingRate;
+    const breathDuration = (end - start) / samplingRate;
+
+    // Skip implausible breaths
+    if (breathDuration <= 0 || breathDuration > 20) continue;
+
+    const respiratoryRate = 60 / breathDuration;
+
+    // Tidal volume: integrate inspiratory flow (positive portion)
+    // Find inspiration end (negative-going zero crossing within this breath)
+    let inspEnd = end;
+    for (let j = start + 1; j < end; j++) {
+      if (flowData[j] <= 0 && flowData[j - 1] > 0) {
+        inspEnd = j;
+        break;
+      }
+    }
+
+    let tidalVolume = 0;
+    for (let j = start; j < inspEnd; j++) {
+      tidalVolume += Math.abs(flowData[j]) / samplingRate;
+    }
+
+    metrics.push({
+      time: startTime,
+      rate: respiratoryRate,
+      volume: tidalVolume,
+    });
+  }
+
+  return metrics;
 }

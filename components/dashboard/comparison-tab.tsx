@@ -92,8 +92,9 @@ export function ComparisonTab({ nights, nightA, nightAIndex }: Props) {
             </CardHeader>
             <CardContent className="py-0 pb-3">
               <ComparisonRow label="FL Score" valueA={nightA.wat.flScore} valueB={nightB.wat.flScore} unit="%" format="pct" threshold={THRESHOLDS.watFL} />
-              <ComparisonRow label="Regularity" valueA={nightA.wat.regularityScore} valueB={nightB.wat.regularityScore} unit="%" format="int" threshold={THRESHOLDS.watRegularity} lowerIsBetter={false} />
+              <ComparisonRow label="Regularity" valueA={nightA.wat.regularityScore} valueB={nightB.wat.regularityScore} unit="%" format="int" threshold={THRESHOLDS.watRegularity} />
               <ComparisonRow label="Periodicity" valueA={nightA.wat.periodicityIndex} valueB={nightB.wat.periodicityIndex} unit="%" format="pct" threshold={THRESHOLDS.watPeriodicity} />
+              <ComparisonRow label="Est. Arousal Index" valueA={nightA.wat.estimatedArousalIndex} valueB={nightB.wat.estimatedArousalIndex} unit="/hr" threshold={THRESHOLDS.watEAI} />
             </CardContent>
           </Card>
 

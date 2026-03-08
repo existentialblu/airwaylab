@@ -77,6 +77,7 @@ function buildNightSection(n: NightResult, index: number): string {
           ${metricRow('FL Score', n.wat.flScore, '%', 'watFL')}
           ${metricRow('Regularity', n.wat.regularityScore, '%', 'watRegularity')}
           ${metricRow('Periodicity', n.wat.periodicityIndex, '%', 'watPeriodicity')}
+          ${metricRow('Est. Arousal Index', n.wat.estimatedArousalIndex, '/hr', 'watEAI')}
 
           <tr><td colspan="2" style="padding:8px 12px;font-weight:600;color:#f59e0b;border-bottom:1px solid #1e293b;">NED Analysis</td></tr>
           ${metricRow('NED Mean', n.ned.nedMean, '%', 'nedMean')}

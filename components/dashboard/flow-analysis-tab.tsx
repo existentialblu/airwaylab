@@ -1,19 +1,112 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MetricCard } from '@/components/common/metric-card';
 import { useThresholds } from '@/components/common/thresholds-provider';
 import type { NightResult } from '@/lib/types';
+import { BarChart3 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 
 interface Props {
   selectedNight: NightResult;
   previousNight: NightResult | null;
+  nights: NightResult[];
 }
 
-export function FlowAnalysisTab({ selectedNight, previousNight }: Props) {
+type WATMetricKey = 'flScore' | 'regularityScore' | 'periodicityIndex' | 'estimatedArousalIndex';
+
+const WAT_CHART_CONFIG: Record<WATMetricKey, { label: string; color: string; threshold: number }> = {
+  flScore: { label: 'FL Score', color: 'hsl(213 94% 56%)', threshold: 30 },
+  regularityScore: { label: 'Regularity', color: 'hsl(38 92% 50%)', threshold: 40 },
+  periodicityIndex: { label: 'Periodicity', color: 'hsl(142 71% 45%)', threshold: 20 },
+  estimatedArousalIndex: { label: 'EAI', color: 'hsl(0 84% 60%)', threshold: 70 },
+};
+
+function WATMiniChart({ nights, metricKey }: { nights: NightResult[]; metricKey: WATMetricKey }) {
+  const config = WAT_CHART_CONFIG[metricKey];
+  const data = useMemo(
+    () =>
+      [...nights].reverse().map((n) => ({
+        date: n.dateStr.slice(5),
+        value: +n.wat[metricKey].toFixed(1),
+      })),
+    [nights, metricKey]
+  );
+
+  return (
+    <div className="mt-2 h-[120px] w-full rounded-lg border border-border/30 bg-card/30 p-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 15% / 0.3)" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tick={{ fill: 'hsl(215 20% 55%)', fontSize: 9 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: 'hsl(215 20% 55%)', fontSize: 9 }}
+            axisLine={false}
+            tickLine={false}
+            width={30}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'hsl(217 33% 8%)',
+              border: '1px solid hsl(217 33% 15%)',
+              borderRadius: '0.5rem',
+              fontSize: 11,
+              color: 'hsl(210 40% 93%)',
+            }}
+            formatter={(value) => [String(value), config.label]}
+          />
+          <ReferenceLine
+            y={config.threshold}
+            stroke={config.color}
+            strokeDasharray="4 4"
+            strokeWidth={0.5}
+            strokeOpacity={0.5}
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke={config.color}
+            strokeWidth={2}
+            dot={{ r: 3, fill: config.color }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function FlowAnalysisTab({ selectedNight, previousNight, nights }: Props) {
   const THRESHOLDS = useThresholds();
   const n = selectedNight;
   const p = previousNight;
+  const [expandedCharts, setExpandedCharts] = useState<Record<WATMetricKey, boolean>>({
+    flScore: false,
+    regularityScore: false,
+    periodicityIndex: false,
+    estimatedArousalIndex: false,
+  });
+
+  const toggleChart = (key: WATMetricKey) => {
+    setExpandedCharts((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const hasMultipleNights = nights.length > 1;
 
   return (
     <div className="flex flex-col gap-6">
@@ -22,31 +115,94 @@ export function FlowAnalysisTab({ selectedNight, previousNight }: Props) {
         <h3 className="mb-3 text-sm font-medium text-muted-foreground">
           Wobble Analysis Tool (WAT)
         </h3>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MetricCard
-            label="FL Score"
-            value={n.wat.flScore}
-            unit="%"
-            format="pct"
-            threshold={THRESHOLDS.watFL}
-            previousValue={p?.wat.flScore}
-          />
-          <MetricCard
-            label="Regularity Score"
-            value={n.wat.regularityScore}
-            unit="%"
-            format="int"
-            threshold={THRESHOLDS.watRegularity}
-            previousValue={p?.wat.regularityScore}
-          />
-          <MetricCard
-            label="Periodicity Index"
-            value={n.wat.periodicityIndex}
-            unit="%"
-            format="pct"
-            threshold={THRESHOLDS.watPeriodicity}
-            previousValue={p?.wat.periodicityIndex}
-          />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <MetricCard
+              label="FL Score"
+              value={n.wat.flScore}
+              unit="%"
+              format="pct"
+              threshold={THRESHOLDS.watFL}
+              previousValue={p?.wat.flScore}
+            />
+            {hasMultipleNights && (
+              <button
+                onClick={() => toggleChart('flScore')}
+                aria-pressed={expandedCharts.flScore}
+                aria-label="Toggle FL Score trend chart"
+                className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <BarChart3 className="h-3 w-3" />
+                Trend
+              </button>
+            )}
+            {expandedCharts.flScore && <WATMiniChart nights={nights} metricKey="flScore" />}
+          </div>
+          <div>
+            <MetricCard
+              label="Regularity Score"
+              value={n.wat.regularityScore}
+              unit="%"
+              format="int"
+              threshold={THRESHOLDS.watRegularity}
+              previousValue={p?.wat.regularityScore}
+            />
+            {hasMultipleNights && (
+              <button
+                onClick={() => toggleChart('regularityScore')}
+                aria-pressed={expandedCharts.regularityScore}
+                aria-label="Toggle Regularity Score trend chart"
+                className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <BarChart3 className="h-3 w-3" />
+                Trend
+              </button>
+            )}
+            {expandedCharts.regularityScore && <WATMiniChart nights={nights} metricKey="regularityScore" />}
+          </div>
+          <div>
+            <MetricCard
+              label="Periodicity Index"
+              value={n.wat.periodicityIndex}
+              unit="%"
+              format="pct"
+              threshold={THRESHOLDS.watPeriodicity}
+              previousValue={p?.wat.periodicityIndex}
+            />
+            {hasMultipleNights && (
+              <button
+                onClick={() => toggleChart('periodicityIndex')}
+                aria-pressed={expandedCharts.periodicityIndex}
+                aria-label="Toggle Periodicity Index trend chart"
+                className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <BarChart3 className="h-3 w-3" />
+                Trend
+              </button>
+            )}
+            {expandedCharts.periodicityIndex && <WATMiniChart nights={nights} metricKey="periodicityIndex" />}
+          </div>
+          <div>
+            <MetricCard
+              label="Est. Arousal Index"
+              value={n.wat.estimatedArousalIndex}
+              unit="/hr"
+              threshold={THRESHOLDS.watEAI}
+              previousValue={p?.wat.estimatedArousalIndex}
+            />
+            {hasMultipleNights && (
+              <button
+                onClick={() => toggleChart('estimatedArousalIndex')}
+                aria-pressed={expandedCharts.estimatedArousalIndex}
+                aria-label="Toggle Estimated Arousal Index trend chart"
+                className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <BarChart3 className="h-3 w-3" />
+                Trend
+              </button>
+            )}
+            {expandedCharts.estimatedArousalIndex && <WATMiniChart nights={nights} metricKey="estimatedArousalIndex" />}
+          </div>
         </div>
         <Card className="mt-3 border-border/50">
           <CardContent className="py-4">
@@ -54,9 +210,13 @@ export function FlowAnalysisTab({ selectedNight, previousNight }: Props) {
               <strong className="text-foreground">FL Score</strong> measures the median
               tidal volume ratio — higher values indicate greater flow limitation.{' '}
               <strong className="text-foreground">Regularity</strong> uses Sample Entropy
-              to quantify breathing pattern consistency (higher = more regular).{' '}
+              to quantify breathing pattern consistency — higher = more regular = worse
+              (locked-in pathological patterns).{' '}
               <strong className="text-foreground">Periodicity</strong> uses FFT on minute
-              ventilation to detect cyclic breathing patterns.
+              ventilation to detect cyclic breathing patterns.{' '}
+              <strong className="text-foreground">EAI</strong> detects recovery breaths
+              (2x running baseline) as a proxy for cortical arousals — the best single
+              predictor of acute suffering in UARS.
             </p>
           </CardContent>
         </Card>

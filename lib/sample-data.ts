@@ -40,6 +40,7 @@ const night1WAT: WATResults = {
   flScore: 32,
   regularityScore: 68,
   periodicityIndex: 18,
+  estimatedArousalIndex: 142,
 };
 
 const night1NED: NEDResults = {
@@ -103,6 +104,7 @@ const night2WAT: WATResults = {
   flScore: 24,
   regularityScore: 75,
   periodicityIndex: 14,
+  estimatedArousalIndex: 68,
 };
 
 const night2NED: NEDResults = {
@@ -166,6 +168,7 @@ const night3WAT: WATResults = {
   flScore: 48,
   regularityScore: 52,
   periodicityIndex: 32,
+  estimatedArousalIndex: 248,
 };
 
 const night3NED: NEDResults = {
@@ -204,6 +207,7 @@ const night4WAT: WATResults = {
   flScore: 28,
   regularityScore: 72,
   periodicityIndex: 16,
+  estimatedArousalIndex: 85,
 };
 
 const night4NED: NEDResults = {
@@ -242,6 +246,7 @@ const night5WAT: WATResults = {
   flScore: 38,
   regularityScore: 62,
   periodicityIndex: 24,
+  estimatedArousalIndex: 195,
 };
 
 const night5NED: NEDResults = {

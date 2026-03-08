@@ -481,6 +481,7 @@ function AnalyzePageInner() {
                 <FlowAnalysisTab
                   selectedNight={currentNight}
                   previousNight={previousNight}
+                  nights={nights}
                 />
               </ErrorBoundary>
             </TabsContent>

@@ -130,7 +130,7 @@ describe('THRESHOLDS object', () => {
   it('has all expected threshold keys', () => {
     const expected = [
       'glasgowOverall', 'nedMean', 'nedP95', 'nedClearFL', 'combinedFL',
-      'reraIndex', 'watFL', 'watRegularity', 'watPeriodicity',
+      'reraIndex', 'watFL', 'watRegularity', 'watPeriodicity', 'watEAI',
       'hrClin10', 'odi3', 'odi4', 'tBelow90', 'tBelow94', 'spo2Mean',
     ];
     for (const key of expected) {

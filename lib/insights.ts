@@ -107,21 +107,21 @@ function singleNightInsights(n: NightResult, prev: NightResult | null): Insight[
     });
   }
 
-  // WAT regularity
+  // WAT regularity (high = locked-in pathological patterns = bad)
   if (regL === 'bad') {
     insights.push({
       id: 'regularity-bad',
       type: 'warning',
-      title: 'Irregular breathing patterns',
-      body: `Regularity score of ${Math.round(n.wat.regularityScore)}% indicates significant breath-to-breath variability. This may correlate with arousals.`,
+      title: 'Pathologically regular breathing',
+      body: `Regularity score of ${Math.round(n.wat.regularityScore)}% indicates locked-in breathing patterns. Healthy breathing has natural variability — excessive regularity suggests the airway is driving the rhythm.`,
       category: 'wat',
     });
   } else if (regL === 'good') {
     insights.push({
       id: 'regularity-good',
       type: 'positive',
-      title: 'Stable breathing regularity',
-      body: `Regularity score of ${Math.round(n.wat.regularityScore)}% shows consistent breathing patterns.`,
+      title: 'Healthy breathing variability',
+      body: `Regularity score of ${Math.round(n.wat.regularityScore)}% shows normal breath-to-breath variability.`,
       category: 'wat',
     });
   }

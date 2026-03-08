@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -8,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
@@ -20,35 +19,133 @@ interface Props {
   therapyChangeDate: string | null;
 }
 
-type MetricKey = 'glasgow' | 'flScore' | 'nedMean' | 'reraIndex';
+interface MetricDef {
+  key: string;
+  label: string;
+  color: string;
+  threshold: number;
+  thresholdLabel: string;
+  unit: string;
+  yDomain: [number, number];
+  getValue: (n: NightResult) => number;
+  formatValue: (v: number) => string;
+}
 
-const METRICS: { key: MetricKey; label: string; color: string; threshold: number; thresholdLabel: string }[] = [
-  { key: 'glasgow', label: 'Glasgow', color: 'hsl(213 94% 56%)', threshold: 2.0, thresholdLabel: 'Glasgow = 2.0' },
-  { key: 'flScore', label: 'FL Score', color: 'hsl(142 71% 45%)', threshold: 30, thresholdLabel: 'FL = 30%' },
-  { key: 'nedMean', label: 'NED Mean', color: 'hsl(38 92% 50%)', threshold: 15, thresholdLabel: 'NED = 15%' },
-  { key: 'reraIndex', label: 'RERA/hr', color: 'hsl(0 84% 60%)', threshold: 5, thresholdLabel: 'RERA = 5/hr' },
+const METRIC_CHARTS: MetricDef[] = [
+  {
+    key: 'glasgow',
+    label: 'Glasgow Index',
+    color: 'hsl(213 94% 56%)',
+    threshold: 2.0,
+    thresholdLabel: 'Threshold = 2.0',
+    unit: '',
+    yDomain: [0, 5],
+    getValue: (n) => +n.glasgow.overall.toFixed(2),
+    formatValue: (v) => v.toFixed(1),
+  },
+  {
+    key: 'flScore',
+    label: 'FL Score',
+    color: 'hsl(142 71% 45%)',
+    threshold: 30,
+    thresholdLabel: 'Threshold = 30%',
+    unit: '%',
+    yDomain: [0, 100],
+    getValue: (n) => +n.wat.flScore.toFixed(1),
+    formatValue: (v) => v.toFixed(0) + '%',
+  },
+  {
+    key: 'nedMean',
+    label: 'NED Mean',
+    color: 'hsl(38 92% 50%)',
+    threshold: 15,
+    thresholdLabel: 'Threshold = 15%',
+    unit: '%',
+    yDomain: [0, 60],
+    getValue: (n) => +n.ned.nedMean.toFixed(1),
+    formatValue: (v) => v.toFixed(1) + '%',
+  },
+  {
+    key: 'reraIndex',
+    label: 'RERA Index',
+    color: 'hsl(0 84% 60%)',
+    threshold: 5,
+    thresholdLabel: 'Threshold = 5/hr',
+    unit: '/hr',
+    yDomain: [0, 25],
+    getValue: (n) => +n.ned.reraIndex.toFixed(1),
+    formatValue: (v) => v.toFixed(1),
+  },
+  {
+    key: 'eai',
+    label: 'Est. Arousal Index',
+    color: 'hsl(280 70% 55%)',
+    threshold: 70,
+    thresholdLabel: 'Threshold = 70/hr',
+    unit: '/hr',
+    yDomain: [0, 300],
+    getValue: (n) => +n.wat.estimatedArousalIndex.toFixed(1),
+    formatValue: (v) => v.toFixed(0),
+  },
+  {
+    key: 'regularity',
+    label: 'Regularity Score',
+    color: 'hsl(25 95% 53%)',
+    threshold: 40,
+    thresholdLabel: 'Threshold = 40%',
+    unit: '%',
+    yDomain: [0, 100],
+    getValue: (n) => +n.wat.regularityScore.toFixed(0),
+    formatValue: (v) => v.toFixed(0) + '%',
+  },
+  {
+    key: 'periodicity',
+    label: 'Periodicity Index',
+    color: 'hsl(170 70% 45%)',
+    threshold: 20,
+    thresholdLabel: 'Threshold = 20%',
+    unit: '%',
+    yDomain: [0, 100],
+    getValue: (n) => +n.wat.periodicityIndex.toFixed(1),
+    formatValue: (v) => v.toFixed(1) + '%',
+  },
 ];
 
-export const TrendChart = memo(function TrendChart({ nights, therapyChangeDate }: Props) {
-  const [visible, setVisible] = useState<Record<MetricKey, boolean>>({
-    glasgow: true,
-    flScore: true,
-    nedMean: true,
-    reraIndex: true,
-  });
-
-  const data = useMemo(() => [...nights]
-    .reverse()
-    .map((n) => ({
+function SingleMetricChart({
+  metric,
+  nights,
+  therapyChangeDate,
+}: {
+  metric: MetricDef;
+  nights: NightResult[];
+  therapyChangeDate: string | null;
+}) {
+  const data = useMemo(() => {
+    const raw = [...nights].reverse().map((n) => ({
       date: n.dateStr.slice(5),
       fullDate: n.dateStr,
-      glasgow: +n.glasgow.overall.toFixed(1),
-      flScore: +n.wat.flScore.toFixed(1),
-      nedMean: +n.ned.nedMean.toFixed(1),
-      reraIndex: +n.ned.reraIndex.toFixed(1),
-    })), [nights]);
+      value: metric.getValue(n),
+      avg7: 0 as number | undefined,
+    }));
 
-  // O(1) lookup for tooltip label formatting instead of linear search
+    // 7-day rolling average (centered where possible, trailing at edges)
+    const WINDOW = 7;
+    if (raw.length >= WINDOW) {
+      for (let i = 0; i < raw.length; i++) {
+        const start = Math.max(0, i - WINDOW + 1);
+        const slice = raw.slice(start, i + 1);
+        raw[i].avg7 = +(slice.reduce((s, d) => s + d.value, 0) / slice.length).toFixed(2);
+      }
+    } else {
+      // Not enough data for rolling average — hide the line
+      for (const d of raw) d.avg7 = undefined;
+    }
+
+    return raw;
+  }, [nights, metric]);
+
+  const hasAvg = data.some((d) => d.avg7 !== undefined);
+
   const dateToFullDate = useMemo(() => {
     const map = new Map<string, string>();
     for (const d of data) map.set(d.date, d.fullDate);
@@ -57,49 +154,24 @@ export const TrendChart = memo(function TrendChart({ nights, therapyChangeDate }
 
   const therapyChangeDateShort = therapyChangeDate?.slice(5);
 
-  const toggleMetric = useCallback((key: MetricKey) => {
-    setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
-
   return (
     <Card className="border-border/50">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-sm font-medium">Multi-Night Trends</CardTitle>
-          <div className="flex flex-wrap gap-1.5">
-            {METRICS.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => toggleMetric(m.key)}
-                aria-pressed={visible[m.key]}
-                aria-label={`${m.label}: ${visible[m.key] ? 'visible' : 'hidden'}`}
-                className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  visible[m.key]
-                    ? 'border-border bg-card text-foreground'
-                    : 'border-transparent bg-transparent text-muted-foreground/50 line-through'
-                }`}
-              >
-                <div
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: visible[m.key] ? m.color : 'hsl(215 20% 30%)' }}
-                />
-                {m.label}
-              </button>
-            ))}
-          </div>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <div
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: metric.color }}
+          />
+          <CardTitle className="text-xs font-medium">{metric.label}</CardTitle>
         </div>
       </CardHeader>
-      <CardContent>
-        <div
-          className="relative h-[300px] w-full sm:h-[380px]"
-          role="img"
-          aria-label={`Multi-night trend chart showing ${data.length} nights. Metrics displayed: ${METRICS.filter((m) => visible[m.key]).map((m) => m.label).join(', ')}.`}
-        >
-          <span className="pointer-events-none absolute bottom-1 right-2 z-10 select-none text-[9px] text-muted-foreground/30">
+      <CardContent className="pb-3">
+        <div className="relative h-[180px] w-full">
+          <span className="pointer-events-none absolute bottom-0 right-1 z-10 select-none text-[8px] text-muted-foreground/20">
             airwaylab.app
           </span>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 8, left: 0, bottom: 5 }}>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="hsl(217 33% 15% / 0.3)"
@@ -107,28 +179,30 @@ export const TrendChart = memo(function TrendChart({ nights, therapyChangeDate }
               />
               <XAxis
                 dataKey="date"
-                tick={{ fill: 'hsl(215 20% 55%)', fontSize: 10 }}
+                tick={{ fill: 'hsl(215 20% 55%)', fontSize: 9 }}
                 axisLine={{ stroke: 'hsl(217 33% 15%)' }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: 'hsl(215 20% 55%)', fontSize: 10 }}
+                domain={metric.yDomain}
+                tick={{ fill: 'hsl(215 20% 55%)', fontSize: 9 }}
                 axisLine={false}
                 tickLine={false}
-                width={35}
+                width={32}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'hsl(217 33% 8%)',
                   border: '1px solid hsl(217 33% 15%)',
                   borderRadius: '0.5rem',
-                  fontSize: 12,
+                  fontSize: 11,
                   color: 'hsl(210 40% 93%)',
                 }}
                 labelFormatter={(label) => dateToFullDate.get(label as string) ?? label}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                formatter={(value, name) => [
+                  metric.formatValue(value as number),
+                  name as string,
+                ]}
               />
               {/* Therapy change reference line */}
               {therapyChangeDateShort && (
@@ -138,42 +212,71 @@ export const TrendChart = memo(function TrendChart({ nights, therapyChangeDate }
                   strokeDasharray="4 4"
                   strokeWidth={1}
                   label={{
-                    value: 'Settings Change',
+                    value: 'Settings',
                     fill: 'hsl(38 92% 50%)',
-                    fontSize: 10,
+                    fontSize: 9,
                     position: 'top',
                   }}
                 />
               )}
-              {/* Threshold reference lines for visible metrics */}
-              {METRICS.filter((m) => visible[m.key]).map((m) => (
-                <ReferenceLine
-                  key={m.key}
-                  y={m.threshold}
-                  stroke={m.color}
-                  strokeDasharray="8 4"
-                  strokeWidth={0.5}
-                  strokeOpacity={0.4}
-                />
-              ))}
-              {/* Metric lines */}
-              {METRICS.map((m) => (
+              {/* Threshold line */}
+              <ReferenceLine
+                y={metric.threshold}
+                stroke={metric.color}
+                strokeDasharray="8 4"
+                strokeWidth={0.5}
+                strokeOpacity={0.5}
+                label={{
+                  value: metric.thresholdLabel,
+                  fill: 'hsl(215 20% 45%)',
+                  fontSize: 8,
+                  position: 'right',
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                name="Nightly"
+                stroke={metric.color}
+                strokeWidth={1.5}
+                strokeOpacity={0.4}
+                dot={false}
+                activeDot={{ r: 4, fill: metric.color }}
+              />
+              {hasAvg && (
                 <Line
-                  key={m.key}
                   type="monotone"
-                  dataKey={m.key}
-                  name={m.label}
-                  stroke={m.color}
-                  strokeWidth={visible[m.key] ? 2 : 0}
-                  dot={visible[m.key] ? { r: 3, fill: m.color } : false}
-                  activeDot={visible[m.key] ? { r: 5 } : false}
-                  hide={!visible[m.key]}
+                  dataKey="avg7"
+                  name="7-night avg"
+                  stroke={metric.color}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4, fill: metric.color, stroke: 'hsl(217 33% 8%)', strokeWidth: 2 }}
+                  connectNulls
                 />
-              ))}
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+export const TrendChart = memo(function TrendChart({ nights, therapyChangeDate }: Props) {
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className="text-sm font-medium text-muted-foreground">Multi-Night Trends</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {METRIC_CHARTS.map((metric) => (
+          <SingleMetricChart
+            key={metric.key}
+            metric={metric}
+            nights={nights}
+            therapyChangeDate={therapyChangeDate}
+          />
+        ))}
+      </div>
+    </div>
   );
 });

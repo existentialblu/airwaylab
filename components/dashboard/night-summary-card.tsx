@@ -50,6 +50,12 @@ export const NightSummaryCard = memo(function NightSummaryCard({ night }: Props)
       color: getTrafficColor(getTrafficLight(wat.periodicityIndex, THRESHOLDS.watPeriodicity)),
     },
     {
+      label: 'EAI',
+      value: wat.estimatedArousalIndex.toFixed(1) + '/hr',
+      tl: getTrafficLight(wat.estimatedArousalIndex, THRESHOLDS.watEAI),
+      color: getTrafficColor(getTrafficLight(wat.estimatedArousalIndex, THRESHOLDS.watEAI)),
+    },
+    {
       label: 'NED Mean',
       value: ned.nedMean.toFixed(1) + '%',
       tl: getTrafficLight(ned.nedMean, THRESHOLDS.nedMean),

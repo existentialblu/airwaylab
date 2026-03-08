@@ -202,11 +202,25 @@ async function readFileList(
       batch.map(async (file) => {
         const path =
           (file as unknown as { webkitRelativePath?: string }).webkitRelativePath || file.name;
-        const buffer = await file.arrayBuffer();
-        return { buffer, path };
+        try {
+          const buffer = await file.arrayBuffer();
+          return { buffer, path };
+        } catch {
+          // Retry once after a short delay (handles Drive Desktop lazy sync)
+          await new Promise((r) => setTimeout(r, 500));
+          try {
+            const buffer = await file.arrayBuffer();
+            return { buffer, path };
+          } catch (err) {
+            console.warn(`[orchestrator] Skipping unreadable file: ${path}`, err);
+            return null;
+          }
+        }
       })
     );
-    results.push(...batchResults);
+    for (const r of batchResults) {
+      if (r) results.push(r);
+    }
     done += batchResults.length;
     onProgress?.(done);
   }

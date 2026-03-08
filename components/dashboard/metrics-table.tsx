@@ -7,7 +7,7 @@ import { getTrafficLight, getTrafficColor, type ThresholdDef } from '@/lib/thres
 import { useThresholds } from '@/components/common/thresholds-provider';
 import type { NightResult } from '@/lib/types';
 
-type SortKey = 'date' | 'glasgow' | 'fl' | 'regularity' | 'periodicity' | 'ned' | 'rera' | 'duration';
+type SortKey = 'date' | 'glasgow' | 'fl' | 'regularity' | 'periodicity' | 'eai' | 'ned' | 'rera' | 'duration';
 
 interface Props {
   nights: NightResult[];
@@ -20,6 +20,7 @@ const cols: { key: SortKey; label: string; shortLabel: string }[] = [
   { key: 'fl', label: 'FL Score', shortLabel: 'FL' },
   { key: 'regularity', label: 'Regularity', shortLabel: 'Reg' },
   { key: 'periodicity', label: 'Periodicity', shortLabel: 'Per' },
+  { key: 'eai', label: 'EAI', shortLabel: 'EAI' },
   { key: 'ned', label: 'NED Mean', shortLabel: 'NED' },
   { key: 'rera', label: 'RERA/hr', shortLabel: 'RERA' },
 ];
@@ -36,6 +37,7 @@ function getMetricValue(n: NightResult, key: SortKey): string {
     case 'fl': return n.wat.flScore.toFixed(1) + '%';
     case 'regularity': return n.wat.regularityScore.toFixed(0) + '%';
     case 'periodicity': return n.wat.periodicityIndex.toFixed(1) + '%';
+    case 'eai': return n.wat.estimatedArousalIndex.toFixed(1) + '/hr';
     case 'ned': return n.ned.nedMean.toFixed(1) + '%';
     case 'rera': return n.ned.reraIndex.toFixed(1);
   }
@@ -47,6 +49,7 @@ function getMetricColor(n: NightResult, key: SortKey, t: Record<string, Threshol
     case 'fl': return getTrafficColor(getTrafficLight(n.wat.flScore, t.watFL));
     case 'regularity': return getTrafficColor(getTrafficLight(n.wat.regularityScore, t.watRegularity));
     case 'periodicity': return getTrafficColor(getTrafficLight(n.wat.periodicityIndex, t.watPeriodicity));
+    case 'eai': return getTrafficColor(getTrafficLight(n.wat.estimatedArousalIndex, t.watEAI));
     case 'ned': return getTrafficColor(getTrafficLight(n.ned.nedMean, t.nedMean));
     case 'rera': return getTrafficColor(getTrafficLight(n.ned.reraIndex, t.reraIndex));
     default: return '';
@@ -74,6 +77,7 @@ export function MetricsTable({ nights }: Props) {
       case 'fl': return n.wat.flScore;
       case 'regularity': return n.wat.regularityScore;
       case 'periodicity': return n.wat.periodicityIndex;
+      case 'eai': return n.wat.estimatedArousalIndex;
       case 'ned': return n.ned.nedMean;
       case 'rera': return n.ned.reraIndex;
       case 'duration': return n.durationHours;
@@ -86,7 +90,7 @@ export function MetricsTable({ nights }: Props) {
     return sortAsc ? av - bv : bv - av;
   }), [nights, sortKey, sortAsc]);
 
-  const metricKeys: SortKey[] = ['glasgow', 'fl', 'regularity', 'periodicity', 'ned', 'rera'];
+  const metricKeys: SortKey[] = ['glasgow', 'fl', 'regularity', 'periodicity', 'eai', 'ned', 'rera'];
 
   return (
     <Card className="border-border/50">
@@ -136,6 +140,9 @@ export function MetricsTable({ nights }: Props) {
                   </td>
                   <td className={`py-2 pr-4 font-mono tabular-nums ${getMetricColor(n, 'periodicity', THRESHOLDS)}`}>
                     {n.wat.periodicityIndex.toFixed(1)}%
+                  </td>
+                  <td className={`py-2 pr-4 font-mono tabular-nums ${getMetricColor(n, 'eai', THRESHOLDS)}`}>
+                    {n.wat.estimatedArousalIndex.toFixed(1)}
                   </td>
                   <td className={`py-2 pr-4 font-mono tabular-nums ${getMetricColor(n, 'ned', THRESHOLDS)}`}>
                     {n.ned.nedMean.toFixed(1)}%

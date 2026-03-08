@@ -103,9 +103,12 @@ export function loadPersistedResults(): {
       return null;
     }
 
-    // Restore Date objects (they get serialised as strings)
+    // Restore Date objects and backfill new fields for old cached data
     for (const night of data.nights) {
       night.date = new Date(night.date);
+      if (night.wat && night.wat.estimatedArousalIndex === undefined) {
+        night.wat.estimatedArousalIndex = 0;
+      }
     }
 
     return {

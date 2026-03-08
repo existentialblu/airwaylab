@@ -61,6 +61,7 @@ export function exportForumSingleNight(n: NightResult): string {
   // WAT
   lines.push('**Ventilation Analysis (WAT)**');
   lines.push(`FL Score: ${fmt(n.wat.flScore)}% ${light(n.wat.flScore, 'watFL')} | Regularity: ${Math.round(n.wat.regularityScore)}% ${light(n.wat.regularityScore, 'watRegularity')} | Periodicity: ${fmt(n.wat.periodicityIndex)}% ${light(n.wat.periodicityIndex, 'watPeriodicity')}`);
+  lines.push(`Est. Arousal Index: ${fmt(n.wat.estimatedArousalIndex)}/hr ${light(n.wat.estimatedArousalIndex, 'watEAI')}`);
   lines.push('');
 
   // NED
@@ -100,12 +101,12 @@ export function exportForumMultiNight(nights: NightResult[]): string {
   lines.push('');
 
   // Table header
-  lines.push('| Date | Duration | Glasgow | FL Score | NED Mean | RERA/hr | Regularity |');
-  lines.push('|------|----------|---------|----------|----------|---------|------------|');
+  lines.push('| Date | Duration | Glasgow | FL Score | NED Mean | RERA/hr | EAI | Regularity |');
+  lines.push('|------|----------|---------|----------|----------|---------|-----|------------|');
 
   for (const n of sorted) {
     lines.push(
-      `| ${n.dateStr} | ${fmtHrs(n.durationHours)} | ${fmt(n.glasgow.overall)} ${light(n.glasgow.overall, 'glasgowOverall')} | ${fmt(n.wat.flScore)}% | ${fmt(n.ned.nedMean)}% | ${fmt(n.ned.reraIndex)} | ${Math.round(n.wat.regularityScore)}% |`
+      `| ${n.dateStr} | ${fmtHrs(n.durationHours)} | ${fmt(n.glasgow.overall)} ${light(n.glasgow.overall, 'glasgowOverall')} | ${fmt(n.wat.flScore)}% | ${fmt(n.ned.nedMean)}% | ${fmt(n.ned.reraIndex)} | ${fmt(n.wat.estimatedArousalIndex)} ${light(n.wat.estimatedArousalIndex, 'watEAI')} | ${Math.round(n.wat.regularityScore)}% |`
     );
   }
 
@@ -114,7 +115,7 @@ export function exportForumMultiNight(nights: NightResult[]): string {
     sorted.reduce((sum, n) => sum + fn(n), 0) / sorted.length;
 
   lines.push(
-    `| **Average** | | **${fmt(avg((n) => n.glasgow.overall))}** | **${fmt(avg((n) => n.wat.flScore))}%** | **${fmt(avg((n) => n.ned.nedMean))}%** | **${fmt(avg((n) => n.ned.reraIndex))}** | **${Math.round(avg((n) => n.wat.regularityScore))}%** |`
+    `| **Average** | | **${fmt(avg((n) => n.glasgow.overall))}** | **${fmt(avg((n) => n.wat.flScore))}%** | **${fmt(avg((n) => n.ned.nedMean))}%** | **${fmt(avg((n) => n.ned.reraIndex))}** | **${fmt(avg((n) => n.wat.estimatedArousalIndex))}** | **${Math.round(avg((n) => n.wat.regularityScore))}%** |`
   );
 
   lines.push('');
